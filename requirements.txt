@@ -1,4 +1,7 @@
 discord.py==1.7.3
 discord_py_slash_command==3.0.3
 Flask==2.0.2
+Flask_SocketIO==5.1.1
+gevent==21.12.0
+gevent-websocket==0.10.1
 python-dotenv==0.19.2
