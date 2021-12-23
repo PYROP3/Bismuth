@@ -1,0 +1,2 @@
+# Bismuth
+Discord bot manager
