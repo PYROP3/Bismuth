@@ -4,50 +4,15 @@
     <meta charset="UTF-8">
     <title>Bismuth</title>
     <script src="{{ url_for('static', filename='jquery.js') }}"></script>
+    <script src="http://code.jquery.com/jquery-latest.min.js"></script>
+    <script src="http://ajax.microsoft.com/ajax/jquery.templates/beta1/jquery.tmpl.min.js"></script>
     <script src="{{ url_for('static', filename='socket.io.js') }}"></script>
+    <script src="{{ url_for('static', filename='bismuth.js') }}"></script>
+    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
 </head>
 <body>
+    <img src="{{ url_for('static', filename='android-chrome-512x512.png') }}" width="100" height="100"/>
    <h1>Bismuth bot manager</h1>
-   <script>
-        //Client-side Javascript code for handling random numbers
-        $(document).ready(function(){
-            console.log("Document ready");
-            //connect to the socket server.
-            var socket_xeroque = io.connect('http://' + document.domain + ':' + location.port + '/logs/xeroque');
-            var data_received_xeroque = [];
-            //receive details from server
-            socket_xeroque.on('data', function(msg) {
-                console.log("Received log -> " + msg.data);
-                //maintain a list of ten numbers
-                if (data_received_xeroque.length >= 20){
-                    data_received_xeroque.shift()
-                }
-                data_received_xeroque.push(msg.data);
-                log_string = '';
-                for (var i = 0; i < data_received_xeroque.length; i++){
-                    log_string = log_string + '<p>' + data_received_xeroque[i].toString() + '</p>';
-                }
-                $('#log_xeroque').html(log_string);
-            });
-            
-            var socket_main = io.connect('http://' + document.domain + ':' + location.port + '/log');
-            var data_received_main = [];
-            //receive details from server
-            socket_main.on('data', function(msg) {
-                console.log("Received log -> " + msg.data);
-                //maintain a list of ten numbers
-                if (data_received_main.length >= 20){
-                    data_received_main.shift()
-                }
-                data_received_main.push(msg.data);
-                log_string = '';
-                for (var i = 0; i < data_received_main.length; i++){
-                    log_string = log_string + '<p>' + data_received_main[i].toString() + '</p>';
-                }
-                $('#log_main').html(log_string);
-            });
-        });
-   </script>
    <script>
         function startXeroque() {
             console.log('Starting Xeroque');
@@ -77,21 +42,22 @@
             }));
         }
     </script>
-    <button onclick="startXeroque()">Start</button>
-    <button onclick="stopXeroque()">Stop</button>
-    <button onclick="restartXeroque()">Restart</button>
    <div class="container" id="content">
     <div class="row">
         <h3>General log:</h3>
-        <div id="log_main">
-        </div> <!-- /#log -->
+        <textarea id="log_main" rows="10" cols="100" readonly>
+        </textarea> <!-- /#log -->
     </div>
 </div>
+<h2>Xeroque</h2>
+<button onclick="startXeroque()">Start</button>
+<button onclick="stopXeroque()">Stop</button>
+<button onclick="restartXeroque()">Restart</button>
 <div class="container" id="content">
     <div class="row">
         <h3>Xeroque log:</h3>
-        <div id="log_xeroque">
-        </div> <!-- /#log -->
+        <textarea id="log_xeroque" rows="10" cols="100" readonly>
+        </textarea> <!-- /#log -->
     </div>
 </div>
 </body>

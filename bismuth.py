@@ -1,8 +1,9 @@
+from bots import available_bots
 from datetime import datetime
-from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit
-from threading import Thread, Event
+from flask import Flask, render_template, request
 from random import random
+from threading import Thread, Event
 from time import sleep
 
 import logging
@@ -11,19 +12,13 @@ import subprocess
 import sys
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'secret!'
 app.logger.root.setLevel(logging.getLevelName(os.getenv('LOG_LEVEL') or 'DEBUG'))
 socketio = SocketIO(app)
-
-bots = {}
 
 def tag_time(msg):
     return "[{}] {}".format(datetime.now().strftime("%d/%b/%Y %H:%M:%S"), msg)
 
-class LogListener:
-    def __init__(self):
-        pass
-
+class LogListener():
     def info(self, msg):
         socketio.emit('data', {'data': tag_time(msg)}, namespace='/log')
         app.logger.info(msg)
@@ -38,31 +33,10 @@ class LogListener:
 
 logger = LogListener()
 
-thread = Thread()
-thread_stop_event = Event()
-class RandomThread(Thread):
-    def __init__(self):
-        self.delay = 1
-        super(RandomThread, self).__init__()
-    def randomNumberGenerator(self):
-        """
-        Generate a random number every 1 second and emit to a socketio instance (broadcast)
-        Ideally to be run in a separate thread?
-        """
-        #infinite loop of magical random numbers
-        print("Making random numbers")
-        while not thread_stop_event.isSet():
-            number = round(random()*10, 3)
-            print(number)
-            socketio.emit('newnumber', {'number': number}, namespace='/test')
-            sleep(self.delay)
-    def run(self):
-        self.randomNumberGenerator()
-
 class BotStdoutLogger(Thread):
     def __init__(self, stdout, namespace):
         self.stdout = stdout
-        self.namespace = namespace
+        self.namespace = "/logs/" + namespace
         self._kill = Event()
         super(BotStdoutLogger, self).__init__()
 
@@ -72,15 +46,17 @@ class BotStdoutLogger(Thread):
     def run(self):
         for stdout_line in self.get_lines():
             if len(stdout_line):
-                socketio.emit('data', {'data': tag_time(stdout_line)}, namespace="/logs/" + self.namespace)
+                # print(f"{stdout_line.rstrip()} -> {self.namespace}")
+                socketio.emit('data', {'data': tag_time(stdout_line)}, namespace=self.namespace)
 
     def get_lines(self):
         while not self._kill.isSet():
             yield self.stdout.readline()
 
 class BotManager(Thread):
-    def __init__(self, bot_file):
-        self.bot_file = os.getcwd() + "\\bots\\" + bot_file
+    def __init__(self, bot_folder, bot_file, bot_id):
+        self.bot_file = os.path.join(os.getcwd(), "bots", bot_folder, bot_file)
+        self.bot_id = bot_id
         self.subprocess = None
         super(BotManager, self).__init__()
 
@@ -90,7 +66,7 @@ class BotManager(Thread):
     def start_bot(self, *args, **kwargs):
         logger.info(f"Starting bot {self.bot_file}")
         self.subprocess = subprocess.Popen([sys.executable, self.bot_file], stdout=subprocess.PIPE, universal_newlines=True)
-        self.logger = BotStdoutLogger(self.subprocess.stdout, "xeroque")
+        self.logger = BotStdoutLogger(self.subprocess.stdout, self.bot_id)
         self.logger.start()
 
     def bot_running(self):
@@ -106,7 +82,11 @@ class BotManager(Thread):
     def bot_retcode(self):
         return self.subprocess.returncode if self.subprocess is not None else None
 
-bots['xeroque'] = BotManager("XeroqueHomes\\xeroque.py")
+# Dictionary with references to all of the bots
+bots = {}
+for bot_id, folder, bot_file in available_bots:
+    bots[bot_id] = BotManager(folder, bot_file, bot_id)
+
 
 logger.info("Starting all bot managers")
 for key in bots:
@@ -132,4 +112,11 @@ def _bots(bot_id, *args, **kwargs):
         bot_mgr.kill_bot()
     return "Success: {}".format(bot_mgr.bot_retcode())
 
-socketio.run(app)
+if __name__ == '__main__':
+    try:
+        socketio.run(app)
+    except KeyboardInterrupt:
+        logger.info("Captured KeyboardInterrupt, exiting cleanly")
+        for key in bots:
+            bots[key].kill_bot()
+        exit(0)
