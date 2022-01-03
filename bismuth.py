@@ -1,4 +1,11 @@
-from bots import available_bots
+try:
+    from bots import available_bots
+except ImportError:
+    from generate_bots import generate_bots
+    generate_bots()
+    print("Bot files generated, please restart")
+    exit()
+
 from datetime import datetime
 from flask_socketio import SocketIO, emit
 from flask import Flask, render_template, request
@@ -19,17 +26,35 @@ def tag_time(msg):
     return "[{}] {}".format(datetime.now().strftime("%d/%b/%Y %H:%M:%S"), msg)
 
 class LogListener():
+    def __init__(self):
+        self._history = []
+
     def info(self, msg):
-        socketio.emit('data', {'data': tag_time(msg)}, namespace='/log')
+        data = tag_time(msg)
+        self._history += [data]
+        self.emit_data(data)
         app.logger.info(msg)
 
     def debug(self, msg):
-        socketio.emit('data', {'data': tag_time(msg)}, namespace='/log')
+        data = tag_time(msg)
+        self._history += [data]
+        self.emit_data(data)
         app.logger.debug(msg)
 
     def warn(self, msg):
-        socketio.emit('data', {'data': tag_time(msg)}, namespace='/log')
+        data = tag_time(msg)
+        self._history += [data]
+        self.emit_data(data)
         app.logger.warn(msg)
+
+    def emit_data(self, data):
+        socketio.emit('data', {'data': data}, namespace='/log')
+
+    def get_history(self):
+        return self._history
+
+    def get_formatted_history(self):
+        return "\n".join(self.get_history())
 
 logger = LogListener()
 
@@ -38,6 +63,7 @@ class BotStdoutLogger(Thread):
         self.stdout = stdout
         self.namespace = "/logs/" + namespace
         self._kill = Event()
+        self._history = []
         super(BotStdoutLogger, self).__init__()
 
     def kill(self):
@@ -47,17 +73,26 @@ class BotStdoutLogger(Thread):
         for stdout_line in self.get_lines():
             if len(stdout_line):
                 # print(f"{stdout_line.rstrip()} -> {self.namespace}")
-                socketio.emit('data', {'data': tag_time(stdout_line)}, namespace=self.namespace)
+                data = tag_time(stdout_line)
+                socketio.emit('data', {'data': data}, namespace=self.namespace)
+                self._history += [data]
 
     def get_lines(self):
         while not self._kill.isSet():
             yield self.stdout.readline()
+
+    def get_history(self):
+        return self._history
+
+    def get_formatted_history(self):
+        return "\n".join(self.get_history())
 
 class BotManager(Thread):
     def __init__(self, bot_folder, bot_file, bot_id):
         self.bot_file = os.path.join(os.getcwd(), "bots", bot_folder, bot_file)
         self.bot_id = bot_id
         self.subprocess = None
+        self.logger = None
         super(BotManager, self).__init__()
 
     def run(self, *args, **kwargs):
@@ -82,6 +117,9 @@ class BotManager(Thread):
     def bot_retcode(self):
         return self.subprocess.returncode if self.subprocess is not None else None
 
+    def bot_get_log(self):
+        return self.logger.get_formatted_history() if self.logger is not None else ""
+
 # Dictionary with references to all of the bots
 bots = {}
 for bot_id, folder, bot_file in available_bots:
@@ -95,7 +133,13 @@ for key in bots:
 
 @app.route("/")
 def _index():
-    return render_template('index.html')
+    _bots = [{"name": key, "log": bots[key].bot_get_log()} for key in bots]
+    return render_template('index.html', bots=_bots, main_log=logger.get_formatted_history())
+
+@app.route("/bismuth.js")
+def _bismuth_js():
+    _bots = [{"name": key} for key in bots]
+    return render_template('bismuth.js', bots=_bots), 200, {'Content-Type': 'application/javascript'}
     
 @app.route("/bots/<bot_id>", methods=["POST"])
 def _bots(bot_id, *args, **kwargs):

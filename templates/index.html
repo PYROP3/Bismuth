@@ -7,58 +7,40 @@
     <script src="http://code.jquery.com/jquery-latest.min.js"></script>
     <script src="http://ajax.microsoft.com/ajax/jquery.templates/beta1/jquery.tmpl.min.js"></script>
     <script src="{{ url_for('static', filename='socket.io.js') }}"></script>
-    <script src="{{ url_for('static', filename='bismuth.js') }}"></script>
+    <script src="{{ url_for('_bismuth_js') }}"></script>
     <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
 </head>
 <body>
     <img src="{{ url_for('static', filename='android-chrome-512x512.png') }}" width="100" height="100"/>
    <h1>Bismuth bot manager</h1>
    <script>
-        function startXeroque() {
-            console.log('Starting Xeroque');
+        function emitData(bot, data) {
             var xhr = new XMLHttpRequest();
-            xhr.open("POST", '/bots/xeroque', true);
+            xhr.open("POST", '/bots/' + bot, true);
             xhr.setRequestHeader('Content-Type', 'application/json');
-            xhr.send(JSON.stringify({
-                "status": "start"
-            }));
-        }
-        function restartXeroque() {
-            console.log('Starting Xeroque');
-            var xhr = new XMLHttpRequest();
-            xhr.open("POST", '/bots/xeroque', true);
-            xhr.setRequestHeader('Content-Type', 'application/json');
-            xhr.send(JSON.stringify({
-                "status": "restart"
-            }));
-        }
-        function stopXeroque() {
-            console.log('Stopping Xeroque');
-            var xhr = new XMLHttpRequest();
-            xhr.open("POST", '/bots/xeroque', true);
-            xhr.setRequestHeader('Content-Type', 'application/json');
-            xhr.send(JSON.stringify({
-                "status": "stop"
-            }));
+            xhr.send(JSON.stringify(data));
         }
     </script>
    <div class="container" id="content">
     <div class="row">
-        <h3>General log:</h3>
-        <textarea id="log_main" rows="10" cols="100" readonly>
-        </textarea> <!-- /#log -->
+        <h3><button onclick="document.getElementById('main_log').innerHTML=''">Clear</button> General log:</h3> 
+        <textarea id="main_log" rows="10" cols="100" readonly>{{ main_log }}</textarea>
     </div>
 </div>
-<h2>Xeroque</h2>
-<button onclick="startXeroque()">Start</button>
-<button onclick="stopXeroque()">Stop</button>
-<button onclick="restartXeroque()">Restart</button>
-<div class="container" id="content">
-    <div class="row">
-        <h3>Xeroque log:</h3>
-        <textarea id="log_xeroque" rows="10" cols="100" readonly>
-        </textarea> <!-- /#log -->
+
+{% for bot in bots %}
+    <h2>{{ bot.name | capitalize }}</h2>
+    <button onclick="emitData('{{ bot.name }}', {'status':'start'})">Start</button>
+    <button onclick="emitData('{{ bot.name }}', {'status':'stop'})">Stop</button>
+    <button onclick="emitData('{{ bot.name }}', {'status':'restart'})">Restart</button>
+    <div class="container" id="content">
+        <div class="row">
+            <h3><button onclick="document.getElementById('log_{{ bot.name }}').innerHTML=''">Clear</button> {{ bot.name | capitalize }} log:</h3>
+            <textarea id="log_{{ bot.name }}" rows="10" cols="100" readonly>{{ bot.log }}</textarea>
+        </div>
     </div>
-</div>
+{% else %}
+    <em><p>No bots found</p></em>
+{% endfor %}
 </body>
 </html>
