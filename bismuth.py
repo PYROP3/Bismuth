@@ -73,7 +73,7 @@ class BotStdoutLogger(Thread):
         for stdout_line in self.get_lines():
             if len(stdout_line):
                 # print(f"{stdout_line.rstrip()} -> {self.namespace}")
-                data = tag_time(stdout_line)
+                data = tag_time(stdout_line.rstrip())
                 socketio.emit('data', {'data': data}, namespace=self.namespace)
                 self._history += [data]
 
@@ -109,10 +109,13 @@ class BotManager(Thread):
 
     def kill_bot(self):
         if self.subprocess is not None:
+            logger.info(f"Stopping bot {self.bot_file}")
             self.subprocess.terminate()
             self.logger.kill()
             self.subprocess = None
             self.logger = None
+        else:
+            logger.warn(f"Bot {self.bot_file} was not running")
 
     def bot_retcode(self):
         return self.subprocess.returncode if self.subprocess is not None else None
