@@ -79,7 +79,7 @@ class BotStdoutLogger(Thread):
 
     def get_lines(self):
         while not self._kill.isSet():
-            yield self.stdout.readline()
+            yield self.stdout.readline().rstrip()
 
     def get_history(self):
         return self._history
@@ -138,6 +138,7 @@ logger.info("Starting all bot managers")
 for key in bots:
     logger.debug(f"-> {key}")
     bots[key].start()
+    bots[key].start_bot()
 
 @app.route("/")
 def _index():
@@ -174,7 +175,7 @@ def _status(bot_id, *args, **kwargs):
 
 if __name__ == '__main__':
     try:
-        socketio.run(app)
+        socketio.run(app, host='0.0.0.0')
     except KeyboardInterrupt:
         logger.info("Captured KeyboardInterrupt, exiting cleanly")
         for key in bots:
