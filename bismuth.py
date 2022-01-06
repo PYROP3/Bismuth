@@ -93,16 +93,22 @@ class BotManager(Thread):
         self.bot_id = bot_id
         self.subprocess = None
         self.logger = None
+        self.logger_err = None
         super(BotManager, self).__init__()
 
     def run(self, *args, **kwargs):
         logger.info(f"Starting manager for {self.bot_file}")
 
     def start_bot(self, *args, **kwargs):
+        if self.bot_running():
+            logger.warn(f"Bot {self.bot_file} already running, ignoring start command")
+            return
         logger.info(f"Starting bot {self.bot_file}")
-        self.subprocess = subprocess.Popen([sys.executable, self.bot_file], stdout=subprocess.PIPE, universal_newlines=True)
+        self.subprocess = subprocess.Popen([sys.executable, self.bot_file], stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
         self.logger = BotStdoutLogger(self.subprocess.stdout, self.bot_id)
         self.logger.start()
+        self.logger_err = BotStdoutLogger(self.subprocess.stderr, self.bot_id)
+        self.logger_err.start()
 
     def bot_running(self):
         return self.subprocess is not None and self.subprocess.returncode is not None
@@ -128,7 +134,6 @@ bots = {}
 for bot_id, folder, bot_file in available_bots:
     bots[bot_id] = BotManager(folder, bot_file, bot_id)
 
-
 logger.info("Starting all bot managers")
 for key in bots:
     logger.debug(f"-> {key}")
@@ -148,6 +153,8 @@ def _bismuth_js():
 def _bots(bot_id, *args, **kwargs):
     data = request.get_json(force=True)
     status = data['status']
+    if bot_id not in bots:
+        return "unknown id", 404
     bot_mgr = bots[bot_id]
     logger.debug(f"Bot {bot_id} received setting {status}")
     if status == 'start':
@@ -158,6 +165,12 @@ def _bots(bot_id, *args, **kwargs):
     elif status == 'stop':
         bot_mgr.kill_bot()
     return "Success: {}".format(bot_mgr.bot_retcode())
+    
+@app.route("/status/<bot_id>")
+def _status(bot_id, *args, **kwargs):
+    if bot_id not in bots:
+        return "unknown id", 404
+    return "up" if bots[bot_id].bot_running() else "down"
 
 if __name__ == '__main__':
     try:
