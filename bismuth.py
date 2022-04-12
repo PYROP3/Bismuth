@@ -76,6 +76,8 @@ class BotStdoutLogger(Thread):
                 data = tag_time(stdout_line.rstrip())
                 socketio.emit('data', {'data': data}, namespace=self.namespace)
                 self._history += [data]
+                with open('logs/{}_{}.log'.format(self.namespace, datetime.now().strftime("%Y_%b_%d)")), 'a') as f:
+                    f.write(data)
 
     def get_lines(self):
         while not self._kill.isSet():
